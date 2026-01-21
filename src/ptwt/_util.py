@@ -801,7 +801,7 @@ def _deprecated_alias(
 
 def _group_for_symmetric(padding: tuple[int, ...]) -> list[tuple[int, int]]:
     """Repack the padding tuple for symmetric padding."""
-    return list(reversed(list(grouper(padding, 2))))  # type:ignore[arg-type]
+    return list(reversed(list(grouper(padding, 2))))  # type: ignore[arg-type]
 
 
 def _get_padding_n(
