@@ -80,8 +80,7 @@ def cwt(
         scales = np.array([scales])
 
     if isinstance(wavelet, torch.nn.Module):
-        if data.is_cuda:
-            wavelet.cuda()
+        wavelet = wavelet.to(data.device)
 
     int_psi, x = _integrate_wavelet(wavelet, precision=precision)
     if type(wavelet) is ContinuousWavelet:
@@ -139,7 +138,7 @@ def cwt(
         out_tensor = out_tensor.real
     elif isinstance(wavelet, _DifferentiableContinuousWavelet):
         out_tensor = out_tensor if wavelet.complex_cwt else out_tensor.real
-        wavelet.cpu()
+        pass  # wavelet stays on original device; moved back at end if needed
     else:
         out_tensor = out_tensor if wavelet.complex_cwt else out_tensor.real
 
@@ -150,8 +149,7 @@ def cwt(
     frequencies /= sampling_period
 
     if isinstance(wavelet, _DifferentiableContinuousWavelet):
-        if data.is_cuda:
-            wavelet.cuda()
+        wavelet = wavelet.to(data.device)
 
     return out_tensor, frequencies
 
