@@ -65,6 +65,38 @@ def test_cwt_cuda(cuda: bool, wavelet: str = "cgau6") -> None:
     assert np.allclose(freqs, freqs_pt)
 
 
+@pytest.mark.parametrize("wavelet", ["mexh", "morl", "cgau6", "gaus4"])
+def test_cwt_device_agnostic(wavelet: str) -> None:
+    """Test CWT works on CPU, CUDA, and MPS devices."""
+    # Determine available device
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        device = torch.device("mps")
+    else:
+        pytest.skip("No GPU device available")
+
+    t = np.linspace(-2, 2, 200, endpoint=False)
+    sig = np.sin(2 * np.pi * 7 * t)
+    data_cpu = torch.from_numpy(sig.astype(np.float32))
+    data_device = data_cpu.to(device)
+    scales = np.arange(1, 16)
+
+    # Run on device
+    coefs_device, freqs = cwt(data_device, scales, wavelet)
+
+    # Verify output is on correct device
+    assert coefs_device.device.type == device.type, (
+        f"Output on {coefs_device.device}, expected {device}"
+    )
+
+    # Verify numerical correctness vs CPU
+    coefs_cpu, _ = cwt(data_cpu, scales, wavelet)
+    torch.testing.assert_close(
+        coefs_device.cpu(), coefs_cpu, rtol=1e-4, atol=1e-5
+    )
+
+
 @pytest.mark.parametrize("wavelet", continuous_wavelets)
 def test_cwt_batched(wavelet: str) -> None:
     """Test batched transforms."""
