@@ -60,3 +60,8 @@ examples = [
 [build-system]
 requires = ["pdm-backend"]
 build-backend = "pdm.backend"
+
+[dependency-groups]
+dev = [
+    "nox>=2025.11.12",
+]
