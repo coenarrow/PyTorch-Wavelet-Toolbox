@@ -143,6 +143,26 @@ def test_nn_cwt(samples: int, scales: Any, cuda: bool) -> None:
     assert np.allclose(freqs, freqs_pt)
 
 
+@pytest.mark.parametrize("scales", [np.arange(1, 16), 5.0, torch.arange(1, 16)])
+@pytest.mark.parametrize("samples", [31, 32])
+def test_nn_cwt_device_agnostic(scales: Any, samples: int) -> None:
+    """Test differentiable CWT on GPU devices."""
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        # Note: Differentiable wavelets use float64 internally which MPS
+        # doesn't support. Skip MPS for learnable wavelet tests.
+        pytest.skip("CUDA not available (MPS doesn't support float64 wavelets)")
+
+    wavelet = _ShannonWavelet("shan1-1")
+    data = torch.randn(1, samples, dtype=torch.float64, device=device)
+
+    coefs, freqs = cwt(data, scales, wavelet)
+
+    assert coefs.device.type == device.type
+    assert coefs.shape[-1] == samples
+
+
 @pytest.mark.slow
 def test_cwt_performance_benchmark() -> None:
     """Benchmark CWT performance on available devices."""
