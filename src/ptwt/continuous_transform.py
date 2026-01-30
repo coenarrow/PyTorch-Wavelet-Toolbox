@@ -83,14 +83,23 @@ def cwt(
         wavelet = wavelet.to(data.device)
 
     int_psi, x = _integrate_wavelet(wavelet, precision=precision)
+    # Determine dtype: preserve complex if wavelet is complex, otherwise use data.dtype
+    # MPS doesn't support float64, so we use data.dtype for device compatibility
     if type(wavelet) is ContinuousWavelet:
         int_psi = np.conj(int_psi) if wavelet.complex_cwt else int_psi
-        int_psi = torch.tensor(int_psi, device=data.device)
+        if wavelet.complex_cwt:
+            # For complex wavelets, convert to complex dtype matching data precision
+            complex_dtype = (
+                torch.complex64 if data.dtype == torch.float32 else torch.complex128
+            )
+            int_psi = torch.tensor(int_psi, device=data.device, dtype=complex_dtype)
+        else:
+            int_psi = torch.tensor(int_psi, device=data.device, dtype=data.dtype)
     elif isinstance(wavelet, torch.nn.Module):
         int_psi = torch.conj(int_psi) if wavelet.complex_cwt else int_psi
     else:
-        int_psi = torch.tensor(int_psi, device=data.device)
-        x = torch.tensor(x, device=data.device)
+        int_psi = torch.tensor(int_psi, device=data.device, dtype=data.dtype)
+        x = torch.tensor(x, device=data.device, dtype=data.dtype)
 
     # convert int_psi, x to the same precision as the data
     # x = np.asarray(x, dtype=data.cpu().numpy().real.dtype)
@@ -123,12 +132,17 @@ def cwt(
         conv = ifft(fft_wav * fft_data, dim=-1)
         conv = conv[..., : data.shape[-1] + len(int_psi_scale) - 1]
 
-        coef = -np.sqrt(scale) * torch.diff(conv, dim=-1)
+        scale_sqrt = torch.sqrt(
+            torch.tensor(scale, device=data.device, dtype=data.dtype)
+        )
+        coef = -scale_sqrt * torch.diff(conv, dim=-1)
 
         # transform axis is always -1
         d = (coef.shape[-1] - data.shape[-1]) / 2.0
         if d > 0:
-            coef = coef[..., int(np.floor(d)) : -int(np.ceil(d))]
+            d_floor = int(d)
+            d_ceil = int(d) + (1 if d % 1 else 0)
+            coef = coef[..., d_floor:-d_ceil]
         elif d < 0:
             raise ValueError("Selected scale of {} too small.".format(scale))
 
