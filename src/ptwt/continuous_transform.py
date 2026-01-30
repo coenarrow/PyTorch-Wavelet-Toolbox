@@ -248,12 +248,12 @@ class _DifferentiableContinuousWavelet(
 ):
     """A base class for learnable Continuous Wavelets."""
 
-    def __init__(self, name: str):
+    def __init__(self, name: str, dtype: torch.dtype = torch.float64):
         """Create a trainable shannon wavelet."""
         super().__init__()
         super(ContinuousWavelet, self).__init__()
 
-        self.dtype = torch.float64
+        self.dtype = dtype
         # Use torch nn parameter
         self.bandwidth_par = _WaveletParameter(
             torch.sqrt(torch.tensor(self.bandwidth_frequency, dtype=self.dtype)),
