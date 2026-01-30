@@ -141,3 +141,62 @@ def test_nn_cwt(samples: int, scales: Any, cuda: bool) -> None:
     cwtmatr_pt, freqs_pt = cwt(data=sig, scales=scales, wavelet=ptwt_shannon)
     assert np.allclose(cwtmatr_pt.detach().cpu().numpy(), cwtmatr)
     assert np.allclose(freqs, freqs_pt)
+
+
+@pytest.mark.slow
+def test_cwt_performance_benchmark() -> None:
+    """Benchmark CWT performance on available devices."""
+    import time
+
+    # Determine available device
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+        device_name = "CUDA"
+    elif torch.backends.mps.is_available() and torch.backends.mps.is_built():
+        device = torch.device("mps")
+        device_name = "MPS"
+    else:
+        pytest.skip("No GPU device available for benchmark")
+
+    # Large signal for meaningful benchmark
+    t = np.linspace(-2, 2, 8000, endpoint=False)
+    sig = np.sin(2 * np.pi * 7 * t) + np.sin(2 * np.pi * 13 * t)
+    data_cpu = torch.from_numpy(sig.astype(np.float32))
+    data_device = data_cpu.to(device)
+    scales = np.arange(1, 64)
+    wavelet = "morl"
+
+    # Warmup
+    for _ in range(3):
+        coefs_device, _ = cwt(data_device, scales, wavelet)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    elif device.type == "mps":
+        torch.mps.synchronize()
+
+    # Benchmark GPU
+    n_runs = 10
+    start = time.perf_counter()
+    for _ in range(n_runs):
+        coefs_device, _ = cwt(data_device, scales, wavelet)
+    if device.type == "cuda":
+        torch.cuda.synchronize()
+    elif device.type == "mps":
+        torch.mps.synchronize()
+    gpu_time = (time.perf_counter() - start) / n_runs
+
+    # Benchmark CPU
+    start = time.perf_counter()
+    for _ in range(n_runs):
+        _ = cwt(data_cpu, scales, wavelet)
+    cpu_time = (time.perf_counter() - start) / n_runs
+
+    speedup = cpu_time / gpu_time
+    print(f"\n{device_name} benchmark: {gpu_time*1000:.2f}ms vs CPU: {cpu_time*1000:.2f}ms")
+    print(f"Speedup: {speedup:.2f}x")
+
+    # Note: CWT has a Python loop over scales, limiting GPU parallelism.
+    # The test verifies the code runs correctly on GPU; speedup depends on
+    # signal size, number of scales, and would require vectorization to improve.
+    # We only assert the code runs without error - performance is informational.
+    assert coefs_device.device.type == device.type
