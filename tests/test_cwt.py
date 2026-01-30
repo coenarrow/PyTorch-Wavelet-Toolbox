@@ -86,15 +86,13 @@ def test_cwt_device_agnostic(wavelet: str) -> None:
     coefs_device, freqs = cwt(data_device, scales, wavelet)
 
     # Verify output is on correct device
-    assert coefs_device.device.type == device.type, (
-        f"Output on {coefs_device.device}, expected {device}"
-    )
+    assert (
+        coefs_device.device.type == device.type
+    ), f"Output on {coefs_device.device}, expected {device}"
 
     # Verify numerical correctness vs CPU
     coefs_cpu, _ = cwt(data_cpu, scales, wavelet)
-    torch.testing.assert_close(
-        coefs_device.cpu(), coefs_cpu, rtol=1e-4, atol=1e-5
-    )
+    torch.testing.assert_close(coefs_device.cpu(), coefs_cpu, rtol=1e-4, atol=1e-5)
 
 
 @pytest.mark.parametrize("wavelet", continuous_wavelets)
@@ -212,7 +210,9 @@ def test_cwt_performance_benchmark() -> None:
     cpu_time = (time.perf_counter() - start) / n_runs
 
     speedup = cpu_time / gpu_time
-    print(f"\n{device_name} benchmark: {gpu_time*1000:.2f}ms vs CPU: {cpu_time*1000:.2f}ms")
+    gpu_ms = gpu_time * 1000
+    cpu_ms = cpu_time * 1000
+    print(f"\n{device_name} benchmark: {gpu_ms:.2f}ms vs CPU: {cpu_ms:.2f}ms")
     print(f"Speedup: {speedup:.2f}x")
 
     # Note: CWT has a Python loop over scales, limiting GPU parallelism.
